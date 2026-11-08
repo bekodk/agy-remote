@@ -281,6 +281,79 @@ class WindowBridge:
             pass
         return None
 
+    def find_chat_input_coords(self, hwnd: int) -> Optional[Tuple[int, int]]:
+        """Sohbet giriş kutusunun koordinatlarını otomatik bulur veya kayıtlı koordinatları döndürür."""
+        if self.config.chat_input_x is not None and self.config.chat_input_y is not None:
+            return (self.config.chat_input_x, self.config.chat_input_y)
+
+        # 1. UIAutomation ile 'Message input' veya 'Ask anything' ara
+        if HAS_UIA and hwnd:
+            try:
+                root = AutomationElement.FromHandle(IntPtr(hwnd))
+                if root:
+                    els = root.FindAll(TreeScope.Descendants, Condition.TrueCondition)
+                    for i in range(els.Count):
+                        el = els[i]
+                        name = (el.Current.Name or "").strip().lower()
+                        ct = el.Current.ControlType.ProgrammaticName
+                        if (ct == "ControlType.ComboBox" and ("input" in name or "message" in name)) or "ask anything" in name:
+                            r = el.Current.BoundingRectangle
+                            if r.Width > 50 and r.Height > 15:
+                                cx = int(r.X + min(200, r.Width / 2))
+                                cy = int(r.Y + r.Height / 2)
+                                self.config.chat_input_x = cx
+                                self.config.chat_input_y = cy
+                                self.config.save()
+                                return (cx, cy)
+            except Exception:
+                pass
+
+        # 2. Fallback: Pencere geometrisinin alt orta kısmını hedefle (standart Antigravity alt sohbet kutusu)
+        if hwnd:
+            rect = wintypes.RECT()
+            if user32.GetWindowRect(hwnd, ctypes.byref(rect)):
+                w = rect.right - rect.left
+                h = rect.bottom - rect.top
+                if w > 300 and h > 300:
+                    cx = int(rect.left + w / 2)
+                    cy = int(rect.bottom - 70)
+                    return (cx, cy)
+
+        return None
+
+    def find_model_button_coords(self, hwnd: int) -> Optional[Tuple[int, int]]:
+        """Model seçici butonunun koordinatlarını otomatik bulur veya kayıtlı koordinatları döndürür."""
+        if self.config.model_btn_x is not None and self.config.model_btn_y is not None:
+            return (self.config.model_btn_x, self.config.model_btn_y)
+
+        if HAS_UIA and hwnd:
+            try:
+                root = AutomationElement.FromHandle(IntPtr(hwnd))
+                if root:
+                    els = root.FindAll(TreeScope.Descendants, Condition.TrueCondition)
+                    for i in range(els.Count):
+                        el = els[i]
+                        name = (el.Current.Name or "").strip().lower()
+                        ct = el.Current.ControlType.ProgrammaticName
+                        if ct == "ControlType.Button" and (name.startswith("select model") or "model selection" in name):
+                            r = el.Current.BoundingRectangle
+                            if r.Width > 20 and r.Height > 15:
+                                cx = int(r.X + r.Width / 2)
+                                cy = int(r.Y + r.Height / 2)
+                                self.config.model_btn_x = cx
+                                self.config.model_btn_y = cy
+                                self.config.save()
+                                return (cx, cy)
+            except Exception:
+                pass
+
+        # Fallback: Sohbet kutusunun hemen altı
+        chat_coords = self.find_chat_input_coords(hwnd)
+        if chat_coords:
+            return (chat_coords[0] - 20, chat_coords[1] + 46)
+
+        return None
+
     def _focus_target_and_input(self) -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
         target = self.find_target_window()
         if not target and (self.config.chat_input_x is None or self.config.chat_input_y is None):
@@ -292,11 +365,14 @@ class WindowBridge:
                     "Lütfen PC uygulamasından sohbet kutusunu hedefleyin."
                 ),
             )
-        if target:
-            self.focus_window(target["hwnd"])
-        if self.config.chat_input_x is not None and self.config.chat_input_y is not None:
-            self.click_at(self.config.chat_input_x, self.config.chat_input_y)
-            time.sleep(0.08)
+        hwnd = target["hwnd"] if target else 0
+        if hwnd:
+            self.focus_window(hwnd)
+
+        coords = self.find_chat_input_coords(hwnd)
+        if coords:
+            self.click_at(coords[0], coords[1])
+            time.sleep(0.09)
         return True, target, None
 
     def send_message_to_antigravity(self, message: str, press_enter: Optional[bool] = None) -> Dict[str, Any]:
@@ -371,31 +447,13 @@ class WindowBridge:
             self.focus_window(hwnd)
 
         # 1. Model Seçici Butonunun yerini bul ve tıkla
-        mx = self.config.model_btn_x
-        my = self.config.model_btn_y
-
-        if mx is None or my is None:
-            # UIAutomation ile mevcut model butonunu otomatik bulmayı dene
-            uia_btn = self._uia_find_element_coords(
-                hwnd,
-                ["Gemini 4", "Gemini 3.8", "Claude Opus", "Argon", "Model Selection"],
-            )
-            if uia_btn:
-                mx, my = uia_btn
-
-        if mx is None or my is None:
-            if self.config.chat_input_x is not None and self.config.chat_input_y is not None:
-                mx = self.config.chat_input_x
-                my = self.config.chat_input_y + 38
-
-        if mx is None or my is None:
+        m_coords = self.find_model_button_coords(hwnd)
+        if not m_coords:
             return {
                 "ok": False,
-                "error": (
-                    "Model seçici butonu bulunamadı. Lütfen PC'deki Antigravity Remote penceresinden "
-                    "'Model Seçiciyi Hedefle (3 sn)' butonuna bir kez tıklayıp fareyi Antigravity'deki model isminin üzerine götürün."
-                ),
+                "error": "Model seçici butonu bulunamadı. Lütfen PC'deki Antigravity penceresinin açık olduğundan emin olun.",
             }
+        mx, my = m_coords
 
         # Model menüsünü açmak için butona tıkla
         self.click_at(mx, my)
