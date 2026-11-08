@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=65.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "antigravity-remote"
+version = "1.0.0"
+description = "PC'de açık olan Google Antigravity ile telefondan (Wi-Fi / LAN üzerinden) mesajlaşma ve uzaktan kontrol köprüsü."
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [
+    {name = "Berkcan Güler"}
+]
+keywords = ["antigravity", "remote", "mobile", "ai", "agent", "pwa", "websocket"]
+dependencies = [
+    "aiohttp>=3.9.0",
+    "qrcode>=7.4.0",
+    "Pillow>=10.0.0",
+    "rich>=13.0.0",
+    "PyQt6>=6.5.0",
+    "cryptography>=41.0.0",
+    "pythonnet>=3.0.0",
+]
+
+[project.scripts]
+agy-remote = "antigravity_remote.cli:main"
+antigravity-remote = "antigravity_remote.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["antigravity_remote*"]
+
+[tool.setuptools.package-data]
+antigravity_remote = ["static/*"]

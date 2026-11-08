@@ -1,0 +1,243 @@
+﻿<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#000000" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+  <title>Antigravity Remote</title>
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="stylesheet" href="/static/style.css?v=202611082355" />
+</head>
+<body>
+  <!-- PIN DoÄŸrulama EkranÄ± -->
+  <div id="auth-screen" class="auth-overlay hidden">
+    <div class="auth-card">
+      <div class="logo-circle">AGY</div>
+      <h1>Antigravity Remote</h1>
+      <p>PC ekranÄ±ndaki 4 haneli PIN kodunu girin</p>
+      <form id="pin-form">
+        <input
+          type="tel"
+          id="pin-input"
+          maxlength="6"
+          placeholder="â€¢â€¢â€¢â€¢"
+          autocomplete="off"
+          inputmode="numeric"
+          required
+        />
+        <div id="auth-error" class="auth-error hidden">HatalÄ± PIN kodu</div>
+        <button type="submit" class="btn-primary">GiriÅŸ Yap</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Sol MenÃ¼: KonuÅŸma GeÃ§miÅŸi Ã‡ekmecesi -->
+  <div id="drawer-backdrop" class="backdrop hidden"></div>
+  <aside id="conv-drawer" class="drawer">
+    <div class="drawer-header">
+      <h2>Sohbet GeÃ§miÅŸi</h2>
+      <button id="close-drawer-btn" class="icon-btn" aria-label="Kapat">âœ•</button>
+    </div>
+    <div class="drawer-sub">
+      <span id="pc-window-badge" class="window-badge">PC bekleniyor...</span>
+    </div>
+    <div id="conv-list" class="conv-list"></div>
+  </aside>
+
+  <!-- Dosya GÃ¶rÃ¼ntÃ¼leme & DÃ¼zenleme ModalÄ± -->
+  <div id="file-modal" class="modal hidden">
+    <div class="modal-content full-modal">
+      <div class="modal-header">
+        <div class="file-modal-title-wrap">
+          <h3 id="file-modal-title">Dosya</h3>
+          <span id="file-modal-meta" class="file-modal-meta"></span>
+        </div>
+        <div class="modal-header-actions">
+          <button id="save-file-btn" class="btn-mini">ğŸ’¾ Kaydet</button>
+          <button id="copy-file-btn" class="btn-mini secondary-mini">Kopyala</button>
+          <button id="close-file-btn" class="icon-btn">âœ•</button>
+        </div>
+      </div>
+      <div id="file-image-container" class="file-image-container hidden"></div>
+      <textarea
+        id="file-editor-textarea"
+        class="file-editor-textarea"
+        spellcheck="false"
+        autocapitalize="off"
+        autocomplete="off"
+      ></textarea>
+    </div>
+  </div>
+
+  <!-- CanlÄ± Sesli Sohbet (Live Mode) EkranÄ± -->
+  <div id="live-overlay" class="live-overlay hidden">
+    <div class="live-top">
+      <span class="live-title">CANLI SOHBET</span>
+      <button id="live-close-btn" class="icon-btn" aria-label="Kapat">âœ•</button>
+    </div>
+    <div class="live-center">
+      <button id="live-orb" class="live-orb" aria-label="KonuÅŸ">
+        <span class="live-orb-inner"></span>
+      </button>
+      <div id="live-state" class="live-state">BaÅŸlatmak iÃ§in dokun</div>
+      <div id="live-transcript" class="live-transcript"></div>
+    </div>
+    <div class="live-bottom">
+      <p class="live-hint">KonuÅŸ â†’ Antigravity'ye gider â†’ yanÄ±t sesli okunur â†’ tekrar dinler. iPhone'da ses gelmiyorsa yandaki sessiz mod tuÅŸunu kapat.</p>
+      <div class="live-actions">
+        <button id="live-skip-btn" class="btn-mini secondary-mini">â­ OkumayÄ± GeÃ§</button>
+        <button id="live-stop-btn" class="btn-mini">â¹ Bitir</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ana Uygulama EkranÄ± -->
+  <div class="app-container">
+    <!-- Ãœst BaÅŸlÄ±k BarÄ± -->
+    <header class="topbar">
+      <button id="open-drawer-btn" class="icon-btn" title="KonuÅŸmalar">â˜°</button>
+      <div class="topbar-center">
+        <div id="current-conv-title" class="conv-title">Antigravity</div>
+        <div class="status-row">
+          <span id="ws-dot" class="status-dot offline"></span>
+          <span id="status-text" class="status-text">BaÄŸlanÄ±yor...</span>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <button id="tts-toggle-btn" class="icon-btn" title="Sesli YanÄ±t (Otomatik Okuma)">ğŸ”‡</button>
+        <button id="top-limit-badge" class="pill-btn" title="Model & Limit">Limit %0</button>
+        <button id="refresh-btn" class="icon-btn" title="Yenile">â†»</button>
+      </div>
+    </header>
+
+    <!-- 4 Sekmeli Gezinme Ã‡ubuÄŸu (Sohbet | Komutlar | Dosyalar | Model & Limit) -->
+    <nav class="tab-nav">
+      <button class="tab-btn active" data-tab="chat">Sohbet</button>
+      <button class="tab-btn" data-tab="commands">Komutlar <span id="cmd-count-badge" class="tab-count">0</span></button>
+      <button class="tab-btn" data-tab="files">Dosyalar</button>
+      <button class="tab-btn" data-tab="model">Model & Limit</button>
+    </nav>
+
+    <!-- SEKME 1: SOHBET GÃ–RÃœNÃœMÃœ -->
+    <section id="tab-chat" class="tab-panel active">
+      <div id="artifacts-bar" class="artifacts-bar hidden"></div>
+
+      <main id="chat-container" class="chat-container">
+        <div class="empty-state" id="empty-state">
+          <div class="empty-icon">â—¯</div>
+          <h3>BaÄŸlantÄ± HazÄ±r</h3>
+          <p>Yazarak, sesli konuÅŸarak veya Ã§oklu gÃ¶rsel gÃ¶ndererek PC'deki Antigravity ile iletiÅŸim kurabilirsiniz.</p>
+        </div>
+        <div id="messages-list" class="messages-list"></div>
+        <div id="working-indicator" class="working-indicator hidden">
+          <div class="spinner"></div>
+          <span id="working-text">Antigravity yanÄ±t hazÄ±rlÄ±yor...</span>
+        </div>
+      </main>
+
+      <!-- HÄ±zlÄ± Aksiyon & Slash Komut BarÄ± -->
+      <div class="quick-actions-bar">
+        <button id="live-mode-btn" class="chip live-chip">ğŸ§ CanlÄ± Sohbet</button>
+        <button class="chip action-chip" data-action="enter">â Onayla</button>
+        <button class="chip action-chip" data-action="alt_enter">Alt+Enter</button>
+        <button class="chip action-chip" data-action="escape">â¹ Durdur</button>
+        <button class="chip slash-chip" data-slash="/plan ">/plan</button>
+        <button class="chip slash-chip" data-slash="/boost ">/boost</button>
+        <button class="chip slash-chip" data-slash="/goal ">/goal</button>
+        <button class="chip slash-chip" data-slash="/compact">/compact</button>
+      </div>
+
+      <!-- Ã‡oklu GÃ¶rsel Ã–nizleme BarÄ± -->
+      <div id="image-preview-bar" class="image-preview-bar hidden">
+        <div id="preview-thumbs-list" class="preview-thumbs-list"></div>
+        <div class="preview-bar-right">
+          <span id="preview-count-label" class="preview-label">1 gÃ¶rsel</span>
+          <button id="clear-images-btn" class="btn-mini secondary-mini">Temizle</button>
+        </div>
+      </div>
+
+      <!-- Alt Mesaj, Sesli Mikrofon ve Ã‡oklu GÃ¶rsel GÃ¶nderme AlanÄ± -->
+      <footer class="composer">
+        <input type="file" id="image-file-input" accept="image/*" multiple class="hidden" />
+        <button id="attach-img-btn" class="attach-btn" title="Ã‡oklu GÃ¶rsel Ekle" aria-label="GÃ¶rsel Ekle">ï¼‹</button>
+        <button id="mic-btn" class="mic-btn" title="Sesli KonuÅŸarak Yaz" aria-label="Sesli KonuÅŸ">ğŸ™ï¸</button>
+        <textarea
+          id="message-input"
+          rows="1"
+          placeholder="Mesaj yazÄ±n veya ğŸ™ï¸ konuÅŸun..."
+        ></textarea>
+        <button id="send-btn" class="send-btn" aria-label="GÃ¶nder">â†‘</button>
+      </footer>
+    </section>
+
+    <!-- SEKME 2: Ã‡ALIÅTIRILAN KOMUTLAR & ARAÃ‡ Ã‡IKTILARI -->
+    <section id="tab-commands" class="tab-panel hidden">
+      <div class="panel-scroll">
+        <div class="panel-header-card">
+          <h4>Ã‡alÄ±ÅŸtÄ±rÄ±lan Komutlar & Dosya Ä°ÅŸlemleri</h4>
+          <p>Antigravity'nin bu konuÅŸmada Ã§alÄ±ÅŸtÄ±rdÄ±ÄŸÄ± tÃ¼m terminal komutlarÄ± ve Ã§Ä±ktÄ±larÄ±:</p>
+        </div>
+        <div id="commands-list" class="commands-list"></div>
+      </div>
+    </section>
+
+    <!-- SEKME 3: PROJE KLASÃ–RÃœ & DOSYA DÃœZENLEYÄ°CÄ° -->
+    <section id="tab-files" class="tab-panel hidden">
+      <div class="files-toolbar">
+        <select id="workspace-select" class="workspace-select"></select>
+        <button id="new-file-btn" class="btn-mini">ï¼‹ Yeni Dosya</button>
+        <button id="up-dir-btn" class="btn-mini secondary-mini">â†‘ Ãœst</button>
+      </div>
+      <div id="current-path-bar" class="current-path-bar">/</div>
+      <div id="files-list" class="files-list"></div>
+    </section>
+
+    <!-- SEKME 4: DOÄRUDAN MODEL SEÃ‡Ä°MÄ° & LÄ°MÄ°T DURUMU -->
+    <section id="tab-model" class="tab-panel hidden">
+      <div class="panel-scroll">
+        <!-- DoÄŸrudan Model SeÃ§imi Listesi -->
+        <div class="stat-section">
+          <div class="stat-row-between">
+            <span class="stat-label">MODEL SEÃ‡Ä°MÄ° (DOÄRUDAN TELEFONDAN)</span>
+            <span id="stat-active-model" class="stat-value-bold">â€”</span>
+          </div>
+          <p class="helper-note">Kullanmak istediÄŸiniz modele dokunarak doÄŸrudan geÃ§iÅŸ yapÄ±n:</p>
+          <div id="model-status-toast" class="model-status-toast hidden"></div>
+          <div id="models-list" class="models-list"></div>
+        </div>
+
+        <!-- BaÄŸlam Doluluk BarÄ± -->
+        <div class="stat-section">
+          <div class="progress-wrap" style="margin-top:0">
+            <div class="stat-row-between">
+              <span class="stat-sub">BaÄŸlam (Context) Limit DoluluÄŸu</span>
+              <span id="stat-context-text" class="stat-sub">0 / 1M (0%)</span>
+            </div>
+            <div class="progress-bar-bg">
+              <div id="stat-context-bar" class="progress-bar-fill" style="width: 0%"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bu KonuÅŸma ve BugÃ¼nkÃ¼ Toplam Token Tablosu -->
+        <div class="stats-grid">
+          <div class="stat-box">
+            <div class="stat-box-title">BU SOHBET TOPLAM</div>
+            <div id="stat-conv-total" class="stat-box-num">0</div>
+            <div id="stat-conv-detail" class="stat-box-sub">Ã‡Ä±ktÄ±: 0 â€¢ Cache: %0</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-box-title">SON 24 SAAT (TÃœMÃœ)</div>
+            <div id="stat-today-total" class="stat-box-num">0</div>
+            <div id="stat-today-detail" class="stat-box-sub">0 sohbet â€¢ 0 adÄ±m</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script src="/static/app.js?v=202611082355"></script>
+</body>
+</html>

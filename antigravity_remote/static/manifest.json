@@ -1,0 +1,10 @@
+{
+  "name": "Antigravity Remote",
+  "short_name": "AGY Remote",
+  "description": "PC'de açık olan Google Antigravity ile telefondan siyah-beyaz minimal mesajlaşma ve kontrol arayüzü",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "orientation": "portrait"
+}
